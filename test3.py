@@ -7,7 +7,19 @@ import plotly.graph_objects as go
 
 # --- Données fictives pour l'exemple ---
 # Remplace 'bd_clean' par tes données réelles
-bd_clean = pd.read_csv('bd_clean.csv')
+# Charger les fichiers CSV découpés
+df1 = pd.read_csv("bd_clean_part1.csv")
+df2 = pd.read_csv("bd_clean_part2.csv")
+df3 = pd.read_csv("bd_clean_part3.csv")
+
+# Réassembler les DataFrames
+bd_clean = pd.concat([df1, df2, df3], ignore_index=True)
+
+# Sauvegarder le fichier recomposé
+bd_clean.to_csv("bd_clean.csv", index=False)
+
+print("Fichier reconstitué : bd_clean.csv")
+# bd_clean = pd.read_csv('bd_clean.csv')
 
 # --- Configuration de la page ---
 st.set_page_config(
