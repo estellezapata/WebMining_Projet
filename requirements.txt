@@ -227,7 +227,7 @@ optree==0.13.0
 oracledb==3.0.0
 overrides @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/overrides_1701806336503/work
 packaging @ file:///C:/b/abs_cc1h2xfosn/croot/packaging_1710807447479/work
-pandas
+pandas==1.5.3
 pandocfilters @ file:///opt/conda/conda-bld/pandocfilters_1643405455980/work
 panel @ file:///C:/b/abs_aa_7bchst1/croot/panel_1718119034279/work
 param @ file:///C:/b/abs_52u4gplvtg/croot/param_1711136867369/work
