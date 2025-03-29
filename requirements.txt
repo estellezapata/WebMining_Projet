@@ -2,3 +2,8 @@ pandas
 streamlit
 plotly
 matplotlib
+numpy
+re
+string
+nltk
+sklearn
