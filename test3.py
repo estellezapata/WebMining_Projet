@@ -1,26 +1,43 @@
-import streamlit as st
 
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import numpy as np
+import re
+import string
+import os
 
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans
+
+
+nltk.download('stopwords')
+nltk.download('wordnet')
 
 # --- Données fictives pour l'exemple ---
 # Remplace 'bd_clean' par tes données réelles
-# Charger les fichiers CSV découpés
-df1 = pd.read_csv("bd_clean_part1.csv")
-df2 = pd.read_csv("bd_clean_part2.csv")
-df3 = pd.read_csv("bd_clean_part3.csv")
+bd_clean = pd.read_csv('bd_clean.csv')
 
-# Réassembler les DataFrames
-bd_clean = pd.concat([df1, df2, df3], ignore_index=True)
 
-# Sauvegarder le fichier recomposé
-bd_clean.to_csv("bd_clean.csv", index=False)
+# --- TF-IDF --------------------------
+# Preparation of tweets
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
 
-print("Fichier reconstitué : bd_clean.csv")
-# bd_clean = pd.read_csv('bd_clean.csv')
+def preprocess_text(text):
+    text = text.lower()  # Minuscule
+    text = re.sub(r"http\S+|www\S+|https\S+", '', text, flags=re.MULTILINE)  # Supprimer URLs
+    text = re.sub(r'\@\w+|\#', '', text)  # Supprimer mentions et hashtags
+    text = text.translate(str.maketrans('', '', string.punctuation))  # Supprimer ponctuation
+    words = text.split()
+    words = [lemmatizer.lemmatize(word) for word in words if word not in stop_words]  # Stopwords + lemmatisation
+    return " ".join(words)
 
 # --- Configuration de la page ---
 st.set_page_config(
@@ -33,17 +50,30 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        .header {
+        .header-container {
+            width: 90vw;
             background-color: #2C3E50;
-            padding: 15px;
+            padding: 20px 0;
             text-align: center;
-            font-size: 24px;
+        }
+        .header-title {
+            font-size: 32px;
             color: white;
             font-weight: bold;
+        }
+        .content-box {
+            background-color: #2C3E50;
+            padding: 6px;
             border-radius: 10px;
+            margin-top: 20px;
+            margin-down: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+            padding-left: 30px;
         }
     </style>
-    <div class="header">📊 Tableau de Bord - Analyse des Données</div>
+    <div class="header-container">
+        <span class="header-title">MINING KNOWLEDGE FROM SOCIAL MEDIA DATA DURING CRISIS EVENTS</span>
+    </div>
     """,
     unsafe_allow_html=True
 )
@@ -51,11 +81,41 @@ st.markdown(
 # --- Barre latérale (menu déroulant) ---
 st.sidebar.title("Navigation")
 menu = st.sidebar.selectbox("Choisissez un événement :", 
-                            ["Statistiques Générales", 'wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing'])
+                            ["General Analysis", 'wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing'])
+# --- Paramètres interactifs ---
+st.sidebar.subheader("Paramètres d'analyse TF-IDF")
+top_k = st.sidebar.slider("Nombre de mots à afficher", min_value=5, max_value=5, value=50, step=10)
+num_clusters = st.sidebar.slider("Nombre de clusters K-Means", min_value=2, max_value=5, value=5)
 
-# --- Statistiques Générales ---
-if menu == "Statistiques Générales":
-    st.subheader("📊 Statistiques Générales")
+
+# --- General Analysis ---
+if menu == "General Analysis":
+    # st.subheader("📊 Statistiques Générales")
+    # st.markdown(
+    # """
+    # <style>
+    #     .header {
+    #         background-color: #2C3E50;
+    #         padding: 15px;
+    #         text-align: center;
+    #         font-size: 24px;
+    #         color: white;
+    #         font-weight: bold;
+    #         border-radius: 10px;
+    #     }
+    # </style>
+    # <div class="header">📊 Statistiques Générales</div>
+    # """,
+    # unsafe_allow_html=True
+    # )
+    st.markdown(
+        """
+        <div class="content-box">
+            <h3>📊 General Analysis</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     # Calcul des statistiques générales
     nb_users_uniques = bd_clean['node_id_user'].nunique()
@@ -69,33 +129,40 @@ if menu == "Statistiques Générales":
 
     # Affichage des statistiques générales
     col1, col2, col3 = st.columns(3)
-    col1.metric(label="Nombre d'utilisateurs uniques", value=nb_users_uniques)
-    col2.metric(label="Nombre de tweets uniques", value=nb_tweets_uniques)
-    col3.metric(label="Nombre moyen de followers par utilisateur", value=avg_followers)
+    col1.metric(label="Number of Users", value=nb_users_uniques)
+    col2.metric(label="Total Number of Tweets", value=nb_tweets_uniques)
+    col3.metric(label="Average Number of Followers per User", value=avg_followers)
 
-    col1.metric(label="Nombre de types d'événements", value=nb_event_types)
-    col2.metric(label="Nombre d'ID d'événements uniques", value=nb_events)
+    col1.metric(label="Number of Event Categories", value=nb_event_types)
+    col2.metric(label="Number of Events", value=nb_events)
 
     # st.write(f"Types d'événements uniques : {types_event}")
     # st.write(", ".join(types_event))
-    st.write(f"Types d'événements uniques :")
+    st.write(f"List of Event Categories:")
     # Création d'un DataFrame pour afficher les types d'événements dans un tableau
-    df_types_event = pd.DataFrame(types_event, columns=["Types d'événements"])
+    df_types_event = pd.DataFrame(types_event, columns=["Event Categories"])
     st.table(df_types_event)  # Affichage du tableau
 
     # st.write(f"ID d'événements uniques : {events_uniques}")
     # st.write(", ".join(events_uniques.astype(str)))
-    st.write(f"Evénements :")
+    st.write(f"List of Events:")
     # Création d'un DataFrame pour afficher les types d'événements dans un tableau
-    df_id_event = pd.DataFrame(events_uniques, columns=["Evénements disponibles dans la base"])
+    df_id_event = pd.DataFrame(events_uniques, columns=["Events"])
     st.table(df_id_event)  # Affichage du tableau
 
     # st.write(f"Nombre moyen de followers par utilisateur unique : {avg_followers:.2f}")
 
 # --- Statistiques pour un type d'événement spécifique ---
 elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing']:
-    st.subheader(f"{menu.capitalize()} - Statistiques")
-
+    # st.subheader(f"{menu.capitalize()} - Statistiques")
+    st.markdown(
+        f"""
+        <div class="content-box">
+            <h3>Analysis of {menu.capitalize()}-Related Events</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     # Filtrage des tweets par type d'événement
     event_tweets = bd_clean[bd_clean['eventType_event'] == menu]
 
@@ -140,20 +207,20 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
     df_priority.columns = ['Catégorie', 'Valeur']
 
     # Création du graphique à barres avec Plotly
-    fig = px.bar(df_priority, x="Catégorie", y="Valeur", title="Pourcentage de chaque valeur de 'annotation_postPriority_tweet'",
+    fig = px.bar(df_priority, x="Catégorie", y="Valeur", title="Share of Published Priority Tweets",
                 labels={'Catégorie': 'Annotation Post Priority', 'Valeur': 'Pourcentage (%)'},
                 color="Catégorie",  # Couleur différente pour chaque barre
                 color_continuous_scale='Blues')  # Choix d'une palette de couleurs
 
     # Affichage des résultats pour chaque événement
     col1, col2, col3 = st.columns(3)
-    col1.metric(label="Nombre de tweets uniques", value=nb_tweets_event)
-    col2.metric(label="Tweets retweetés", value=f"{tweets_retweeted} ({pourcentage_retweet:.2f}%)")
-    col3.metric(label="Nombre total de retweets", value=total_retweets)
+    col1.metric(label="Total Number of Tweets", value=nb_tweets_event)
+    col2.metric(label="Number of Retweeted Tweets", value=f"{tweets_retweeted} ({pourcentage_retweet:.2f}%)")
+    col3.metric(label="Total Number of Retweets", value=total_retweets)
 
     # st.write(f"5. Le tweet le plus retweeté : {texte_tweet_max_retweet} avec {tweet_max_retweet['retweet_count_tweet']} retweets")
     # Affichage stylisé avec un encadré markdown
-    st.subheader("Le tweet le plus retweeté")
+    st.subheader("Most Retweeted Tweet")
     st.markdown(
         f"""
         <div style="
@@ -173,13 +240,13 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
 
     # st.write(f"   Texte du tweet le plus retweeté : {texte_tweet_max_retweet}")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric(label="Nombre d'utilisateurs", value=nb_users_event)
-    col2.metric(label="Nombre moyen de followers pour les utilisateurs", value=avg_followers_event)
-    col1.metric(label="Nombre de tweets avec au moins un like", value=f"{tweets_liked} ({pourcentage_likes:.2f}%)")
-    col4.metric(label="Nombre total de likes", value=total_likes)
+    col1.metric(label="Number of Users", value=nb_users_event)
+    col2.metric(label="Average Number of Followers per User", value=avg_followers_event)
+    col1.metric(label="Number of Liked Tweets", value=f"{tweets_liked} ({pourcentage_likes:.2f}%)")
+    col4.metric(label="Total Number of Likes", value=total_likes)
 
     # st.write(f"6. Nombre de tweets avec au moins un like : {tweets_liked} ({pourcentage_likes:.2f}%)")
-    st.write(f"Les 3 utilisateurs ayant publié le plus de tweets uniques :")
+    st.write(f"Top 3 Users with the Most Tweets::")
     st.write(top_3_users)
     # st.write(f"10. Pourcentage de chaque valeur de 'annotation_postPriority_tweet' :")
     # st.write(priority_percentages)
@@ -187,14 +254,22 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
     # Affichage du graphique dans Streamlit
     # st.pyplot(fig)
     st.plotly_chart(fig, use_container_width=True)
-    st.write(f"Les 5 hashtags les plus récurrents et leur nom :")
+    st.write(f"Top 5 Most Frequent Hashtags and Their Occurrences:")
     st.write(top_5_hashtags)
 
     # st.plotly_chart(fig_distrib_tweet)
     # st.line_chart(tweet_count_per_day.set_index("Date"))
     # st.area_chart(tweet_count_per_day.set_index("Date"))
     # --- 📊 Graphique de distribution des tweets dans le temps ---
-    st.subheader(f"📈 Distribution des tweets pour {menu.capitalize()}")
+    # st.subheader(f"📈 Distribution des tweets pour {menu.capitalize()}")
+    st.markdown(
+            f"""
+            <div class="content-box">
+                <h3>📈 Time Distribution of Published Tweets for the {menu.capitalize()} event</h3>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     # Définir la plage de dates complète
     event_tweets['date'] = pd.to_datetime(event_tweets['date'])  # S'assurer que la colonne date est bien en datetime
@@ -257,9 +332,9 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
 
     # Mise en forme du graphique
     fig.update_layout(
-        title="Distribution des Tweets - Flood",
+        title=f"Time Distribution of Published Tweets - {menu}",
         xaxis_title="Date",
-        yaxis_title="Nombre de Tweets",
+        yaxis_title="Number of Tweets",
         xaxis=dict(showgrid=True),
         yaxis=dict(showgrid=True),
         hovermode="x unified",
@@ -282,9 +357,9 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
 
     # Mise en forme du graphique
     fig.update_layout(
-        title="Distribution des Tweets - Flood",
+        title=f"Time Distribution of Published Tweets - {menu}",
         xaxis_title="Date",
-        yaxis_title="Nombre de Tweets",
+        yaxis_title="Number of Tweets",
         xaxis=dict(showgrid=True),
         yaxis=dict(showgrid=True),
         hovermode="x unified",
@@ -312,9 +387,9 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
 
     # Mise en forme du graphique
     fig_word.update_layout(
-        title="Distribution des mots - Flood",
+        title=f"Time Distribution of Published Word Count - {menu}",
         xaxis_title="Date",
-        yaxis_title="Nombre de mots dans les tweets",
+        yaxis_title="Number of Words in Tweets",
         xaxis=dict(showgrid=True),
         yaxis=dict(showgrid=True),
         hovermode="x unified",
@@ -337,9 +412,9 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
 
     # Mise en forme du graphique
     fig_word.update_layout(
-        title="Distribution des mots dans les tweet - Flood",
+        title=f"Time Distribution of Published Word Count - {menu}",
         xaxis_title="Date",
-        yaxis_title="Nombre de mots dans les tweets",
+        yaxis_title="Number of Words in Tweets",
         xaxis=dict(showgrid=True),
         yaxis=dict(showgrid=True),
         hovermode="x unified",
@@ -349,3 +424,97 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
     # Afficher le graphique
     st.plotly_chart(fig_word)
 
+    ## TF-IDF ---------------
+    st.markdown(
+        f"""
+        <div class="content-box">
+            <h3>TF-IDF for {menu.capitalize()}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown("""<div style="margin-bottom: 20px;"></div>""", unsafe_allow_html=True)
+    
+    # Prétraitement des tweets pour l'événement sélectionné
+    tweets_cleaned = [preprocess_text(tweet) for tweet in event_tweets['text_tweet']]
+
+    # 3️⃣ Calculer le TF-IDF
+    vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
+    tfidf_matrix = vectorizer.fit_transform(tweets_cleaned)
+    vocab = vectorizer.get_feature_names_out()
+
+    # 4️⃣ Trouver les k mots avec le plus haut IDF
+    idf_scores = vectorizer.idf_
+    # top_k = 50  # Nombre de mots importants à extraire
+    top_k_indices = idf_scores.argsort()[-top_k:]  # Indices des k plus grands IDF
+    top_k_words = [vocab[i] for i in top_k_indices]
+
+    # 5️⃣ Réduction de dimension avec t-SNE
+    tsne = TSNE(n_components=2, random_state=42, perplexity=5, init="random", learning_rate=200)
+    tfidf_2d = tsne.fit_transform(tfidf_matrix.T[top_k_indices].toarray())  # Transposer pour obtenir les vecteurs de mots
+
+    # 6️⃣ Clustering avec K-Means
+    # num_clusters = 5  # Ajuste selon tes besoins
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42, n_init=10)
+    clusters = kmeans.fit_predict(tfidf_2d)
+
+    # 7️⃣ Création du DataFrame pour Plotly
+    # df_tfidf_graph = pd.DataFrame({
+    #     'word': top_k_words,
+    #     'x': tfidf_2d[:, 0],
+    #     'y': tfidf_2d[:, 1],
+    #     'cluster': clusters
+    # })
+
+    # # 8️⃣ Définition des couleurs pour les clusters (en utilisant une palette discrète)
+    # cluster_colors = px.colors.qualitative.Set1  # Palette de couleurs discrètes
+
+    
+    # 8️⃣ Visualisation interactive avec Plotly
+    # fig_tfidf = px.scatter(df_tfidf_graph, x='x', y='y', text='word', color='cluster', title=f"Clustering des mots importants pour {menu.capitalize()}",
+    #                  labels={'x': 't-SNE X', 'y': 't-SNE Y'}, hover_data={'word': True, 'cluster': True})
+    
+    # # Affichage dans Streamlit
+    # st.plotly_chart(fig_tfidf)
+    # 7️⃣ Visualisation des clusters
+    plt.figure(figsize=(12, 8))
+    for i, word in enumerate(top_k_words):
+        x, y = tfidf_2d[i, 0], tfidf_2d[i, 1]
+        plt.scatter(x, y, c=f"C{clusters[i]}", s=100)  # Couleur selon le cluster
+        plt.text(x + 0.1, y + 0.1, word, fontsize=12)
+
+    plt.title(f"Word Clustering with the Highest TF-IDF Scores for the {menu.capitalize()} event")
+    plt.xlabel("t-SNE X")
+    plt.ylabel("t-SNE Y")
+    plt.grid(True)
+
+    # Afficher le graphique dans Streamlit
+    st.pyplot(plt)
+
+    ###  Word embedding -------------------------------------
+    st.markdown(
+        f"""
+        <div class="content-box">
+            <h3>Word embedding for {menu.capitalize()}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown("""<div style="margin-bottom: 20px;"></div>""", unsafe_allow_html=True)
+    
+    # st.subheader(f"📈 Word embedding for {menu.capitalize()}")
+    image_path = os.path.join("pictures", f"Word_Embeddings-{menu}.png")
+    st.image(image_path, caption=f"Word Embeddings - {menu.capitalize()}", use_container_width=True)
+
+    ###  Tweet embedding -------------------------------------
+    # st.subheader(f"📈 Tweet embedding for {menu.capitalize()}")
+    st.markdown(
+        f"""
+        <div class="content-box">
+            <h3>Tweet embedding for {menu.capitalize()}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown("""<div style="margin-bottom: 20px;"></div>""", unsafe_allow_html=True)
+    
