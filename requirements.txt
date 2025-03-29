@@ -3,8 +3,5 @@ pandas
 plotly
 matplotlib
 numpy
-re
-string
-os
 nltk
-sklearn
+scikit-learn
