@@ -7,3 +7,4 @@ re
 string
 nltk
 sklearn
+os
