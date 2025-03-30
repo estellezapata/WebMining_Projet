@@ -65,10 +65,12 @@ st.markdown(
     """
     <style>
         .header-container {
-            width: 90vw;
+            width: 100%;  /* Utilise la pleine largeur disponible */
+            max-width: 90vw;  /* Limite à 90% de la largeur de la fenêtre */
             background-color: #061987;
             padding: 20px 0;
             text-align: center;
+            margin: 0 auto;  /* Centrer horizontalement */
         }
         .header-title {
             font-size: 32px;
