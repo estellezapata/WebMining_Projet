@@ -23,7 +23,6 @@ nltk.download('wordnet')
 # bd_clean = pd.read_csv('bd_clean.csv')
 
 # Import data
-Lire les trois CSV
 df1 = pd.read_csv('bd_clean_part1.csv')
 df2 = pd.read_csv('bd_clean_part2.csv')
 df3 = pd.read_csv('bd_clean_part3.csv')
