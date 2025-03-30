@@ -577,6 +577,8 @@ elif menu in ['wildfire', 'earthquake', 'flood', 'typhoon', 'shooting', 'bombing
         
         # --- Filtrage des tweets selon le cluster sélectionné ---
         filtered_tweets = tweet_embed_event[tweet_embed_event["cluster_name"] == selected_cluster][["text"]]
+        filtered_tweets = filtered_tweets[["text"]].drop_duplicates()
+
 
         # --- Affichage des tweets ---
         st.subheader(f"📌 Tweets of cluster : {selected_cluster}")
