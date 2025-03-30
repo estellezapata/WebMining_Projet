@@ -20,16 +20,16 @@ from sklearn.cluster import KMeans
 nltk.download('stopwords')
 nltk.download('wordnet')
 
-bd_clean = pd.read_csv('bd_clean.csv')
+# bd_clean = pd.read_csv('bd_clean.csv')
 
 # Import data
 # Lire les trois CSV
-# df1 = pd.read_csv('bd_clean_part1.csv')
-# df2 = pd.read_csv('bd_clean_part2.csv')
-# df3 = pd.read_csv('bd_clean_part3.csv')
+df1 = pd.read_csv('bd_clean_part1.csv')
+df2 = pd.read_csv('bd_clean_part2.csv')
+df3 = pd.read_csv('bd_clean_part3.csv')
 
-# # Concatenation des DataFrames
-# bd_clean = pd.concat([df1, df2, df3], ignore_index=True)
+# Concatenation des DataFrames
+bd_clean = pd.concat([df1, df2, df3], ignore_index=True)
 
 
 
